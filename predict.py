@@ -1,12 +1,13 @@
 import torch
 import pandas as pd
 from bnlp import CleanText
+from sklearn.metrics import confusion_matrix, classification_report
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
 # ==============================
 # LOAD MODEL HASIL TRAINING
 # ==============================
-model_path = "./Bangla_Smishing_Model"
+model_path = "./models/mobile_bangla_smishing_model_epoch40"
 
 tokenizer = AutoTokenizer.from_pretrained(model_path)
 model = AutoModelForSequenceClassification.from_pretrained(model_path)
@@ -20,6 +21,8 @@ id_to_label = {
     1: "promo",
     2: "smish"
 }
+
+label_order = ["normal", "promo", "smish"]
 
 # ==============================
 # CLEANER
@@ -63,13 +66,17 @@ def predict_sms(text):
 # ==============================
 # LOAD VALIDATION DATASET
 # ==============================
-validation_path = "./validation_sms_large.csv"
+validation_path = "./dataset/validation_sms_large.csv"
 
 df = pd.read_csv(validation_path)
 df.columns = df.columns.str.strip()
+df["label"] = df["label"].astype(str).str.strip().str.lower()
 
 correct = 0
 total = len(df)
+
+y_true = []
+y_pred = []
 
 print("\n==============================")
 print("VALIDATION RESULT")
@@ -80,6 +87,9 @@ for index, row in df.iterrows():
     expected_label = row["label"]
 
     predicted_label, confidence = predict_sms(text)
+
+    y_true.append(expected_label)
+    y_pred.append(predicted_label)
 
     is_correct = predicted_label == expected_label
 
@@ -99,6 +109,36 @@ print("\n==============================")
 print("SUMMARY")
 print("==============================")
 print("Total data :", total)
-print("Correct      :", correct)
-print("Wrong    :", total - correct)
+print("Correct    :", correct)
+print("Wrong      :", total - correct)
 print("Accuracy   :", round(accuracy * 100, 2), "%")
+
+# ==============================
+# CONFUSION MATRIX
+# ==============================
+cm = confusion_matrix(y_true, y_pred, labels=label_order)
+
+print("\n==============================")
+print("CONFUSION MATRIX")
+print("==============================")
+print("Rows    = Actual label")
+print("Columns = Predicted label")
+print(pd.DataFrame(
+    cm,
+    index=[f"actual_{label}" for label in label_order],
+    columns=[f"pred_{label}" for label in label_order]
+))
+
+# ==============================
+# CLASSIFICATION REPORT
+# ==============================
+print("\n==============================")
+print("CLASSIFICATION REPORT")
+print("==============================")
+print(classification_report(
+    y_true,
+    y_pred,
+    labels=label_order,
+    target_names=label_order,
+    zero_division=0
+))

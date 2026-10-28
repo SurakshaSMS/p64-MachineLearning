@@ -2,7 +2,7 @@ import torch
 import evaluate
 import numpy as np
 import pandas as pd
-
+import re 
 from datasets import Dataset
 from bnlp import CleanText
 from transformers import (
@@ -14,33 +14,35 @@ from transformers import (
 )
 
 # ==========================================
-# KONFIGURASI DEVICE
+# GPU / CUDA CHECK
 # ==========================================
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f"🚀 Perangkat yang digunakan untuk training: {device}")
+print("Checking GPU availability...")
 
-if device.type == "cuda":
+print(f"PyTorch version: {torch.__version__}")
+print(f"CUDA available: {torch.cuda.is_available()}")
+
+if torch.cuda.is_available():
+    device = torch.device("cuda")
+    print(f"🚀 Perangkat yang digunakan untuk training: {device}")
     print(f"Nama GPU: {torch.cuda.get_device_name(0)}")
+    print(f"CUDA version used by PyTorch: {torch.version.cuda}")
+    print(f"Total GPU memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.2f} GB")
+else:
+    device = torch.device("cpu")
+    print("⚠️ CUDA tidak tersedia. Training akan berjalan di CPU.")
+    print("Pastikan PyTorch versi CUDA sudah terinstall, bukan versi CPU-only.")
 
-save_directory = "./Bangla_Smishing_Model_32"
+save_directory = "./models/mobile_bangla_smishing_model_epoch40"
 
 # ==========================================
 # LOAD DATASET
 # ==========================================
 print("\nLoading the BangalaBarta dataset...")
 
-df = pd.read_csv("./BangalaBarta bangla_spam_sms smishing.csv")
-
-# Bersihkan nama kolom dari spasi / karakter aneh
+df = pd.read_csv("./dataset/BangalaBarta_with_extra_smish.csv")
 df.columns = df.columns.str.strip()
-
-# Pastikan hanya ambil kolom yang dibutuhkan
 df = df[["text", "label"]]
-
-# Bersihkan data kosong
 df = df.dropna(subset=["text", "label"])
-
-# Bersihkan label agar tidak ada spasi / kapital berbeda
 df["label"] = df["label"].astype(str).str.strip().str.lower()
 
 label_to_id = {
@@ -89,18 +91,27 @@ test_dataset = split_dataset["test"]
 # ==========================================
 # LOAD CLEANER, TOKENIZER, MODEL
 # ==========================================
-print("\nLoading BNLP and BanglaBERT...")
+print("\nLoading BNLP and BanglaBERT Small...")
 
 cleaner = CleanText(
     fix_unicode=True,
     unicode_norm=True,
     unicode_norm_form="NFKC",
-    remove_url=True,
-    remove_email=True,
+    remove_url=False,
+    remove_email=False,
     remove_emoji=True
 )
 
-model_name = "csebuetnlp/banglabert"
+def clean_sms(text):
+    text = str(text)
+
+    # Replace URLs and emails with tokens instead of deleting them
+    text = re.sub(r"http\S+|www\S+", " URLTOKEN ", text)
+    text = re.sub(r"\S+@\S+", " EMAILTOKEN ", text)
+
+    return cleaner(text)
+
+model_name = "csebuetnlp/banglabert_small"
 
 hf_tokenizer = AutoTokenizer.from_pretrained(model_name)
 
@@ -117,7 +128,7 @@ hf_model.to(device)
 # PREPROCESS DATA
 # ==========================================
 def process_data(examples):
-    cleaned_texts = [cleaner(str(text)) for text in examples["text"]]
+    cleaned_texts = [clean_sms(text) for text in examples["text"]]
 
     return hf_tokenizer(
         cleaned_texts,
@@ -199,20 +210,20 @@ print("3. Configuring the Trainer...")
 
 training_args = TrainingArguments(
     output_dir="./temp_training_files",
-    num_train_epochs=30,
+    num_train_epochs=40,
     per_device_train_batch_size=4,
     per_device_eval_batch_size=4,
-    learning_rate=2e-5,
+    learning_rate=3e-5,
     weight_decay=0.01,
     logging_steps=10,
-    warmup_ratio= 0.1,
+    warmup_ratio=0.1,
+    lr_scheduler_type="cosine",
     eval_strategy="epoch",
     save_strategy="epoch",
     load_best_model_at_end=True,
     metric_for_best_model="f1",
     greater_is_better=True,
     fp16=torch.cuda.is_available(),
-    report_to="none"
 )
 
 data_collator = DataCollatorWithPadding(tokenizer=hf_tokenizer)
