@@ -1,0 +1,12 @@
+torch
+transformers
+datasets
+evaluate
+accelerate
+pandas
+numpy
+scikit-learn
+bnlp-toolkit
+onnx
+onnxruntime
+optimum[onnxruntime]
