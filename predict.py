@@ -101,7 +101,7 @@ for index, row in df.iterrows():
     print("Expected   :", expected_label)
     print("Predicted  :", predicted_label)
     print("Confidence :", round(confidence * 100, 2), "%")
-    print("Status     :", "BENAR" if is_correct else "SALAH")
+    print("Status     :", "Correct" if is_correct else "Wrong")
 
 accuracy = correct / total
 

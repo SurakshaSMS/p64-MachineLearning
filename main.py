@@ -23,14 +23,13 @@ print(f"CUDA available: {torch.cuda.is_available()}")
 
 if torch.cuda.is_available():
     device = torch.device("cuda")
-    print(f"🚀 Perangkat yang digunakan untuk training: {device}")
-    print(f"Nama GPU: {torch.cuda.get_device_name(0)}")
+    print(f"🚀 Training Device: {device}")
+    print(f"Name GPU: {torch.cuda.get_device_name(0)}")
     print(f"CUDA version used by PyTorch: {torch.version.cuda}")
     print(f"Total GPU memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.2f} GB")
 else:
     device = torch.device("cpu")
-    print("⚠️ CUDA tidak tersedia. Training akan berjalan di CPU.")
-    print("Pastikan PyTorch versi CUDA sudah terinstall, bukan versi CPU-only.")
+    print("⚠️CUDA is not available switching to CPU.")
 
 save_directory = "./models/mobile_bangla_smishing_model_epoch40"
 
@@ -60,7 +59,7 @@ id_to_label = {
 # Cek label yang tidak sesuai
 unknown_labels = set(df["label"].unique()) - set(label_to_id.keys())
 if unknown_labels:
-    raise ValueError(f"Ada label yang tidak dikenali: {unknown_labels}")
+    raise ValueError(f"Unknown labels: {unknown_labels}")
 
 # Ubah label string menjadi angka
 df["label"] = df["label"].map(label_to_id).astype(int)
